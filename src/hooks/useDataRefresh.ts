@@ -1,31 +1,36 @@
-import { useState, useEffect } from 'react';
-export const useDataRefresh = <T,>(initialData: T, refreshCallback: () => Promise<T>, interval = 30000) => {
-  const [data, setData] = useState<T>(initialData);
+import { useState, useEffect, useCallback } from "react";
+import { ApiMethods } from "../types/shared";
+import { useQuery } from "./useQuery";
+
+export const useDataRefresh = <TRequest, TResponse>(
+  url: string,
+  method: ApiMethods = "GET",
+  interval = 30000,
+  data?: unknown
+) => {
+  const { response, loading, error, makeRequest } = useQuery<
+    TRequest,
+    TResponse
+  >(url, method);
+
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const refresh = async () => {
-    try {
-      setIsLoading(true);
-      const newData = await refreshCallback();
-      setData(newData);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to refresh data'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+  const refresh = useCallback(async () => {
+    makeRequest(data);
+    setLastUpdated(new Date());
+  }, [data, makeRequest]);
+
   useEffect(() => {
+    refresh();
     const timer = setInterval(refresh, interval);
     return () => clearInterval(timer);
-  }, [interval]);
+  }, [interval, refresh]);
+
   return {
-    data,
+    response,
     lastUpdated,
-    isLoading,
+    loading,
     error,
-    refresh
+    refresh,
   };
 };
