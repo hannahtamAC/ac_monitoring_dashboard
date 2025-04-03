@@ -2,26 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import apiService from "../services/api-service";
 import { ApiMethods, ServerError } from "../types/shared";
 
-type FlightQueryBodyParams = {
-  language?: string;
-  date?: Date;
-  airlineCode?: string;
-  flightNumber?: string;
-  origin: string;
-  destination: string;
-};
-
-const getBodyParams = (params?: FlightQueryBodyParams) => {
-  if (!params) return {};
-  return {
-    inputArray: [
-      {
-        bound: [params],
-      },
-    ],
-  };
-};
-
 export function useQuery<FlightQueryBodyParams, TResponse>(
   url: string,
   method: ApiMethods = "GET"
@@ -50,7 +30,7 @@ export function useQuery<FlightQueryBodyParams, TResponse>(
           res = await apiService.get(url);
         }
         if (method === "POST") {
-          res = await apiService.post(url, getBodyParams(data));
+          res = await apiService.post(url, data);
         }
         if (method === "PUT") {
           res = await apiService.put(url, data);

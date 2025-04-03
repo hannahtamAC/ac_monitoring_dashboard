@@ -14,13 +14,16 @@ class ApiService {
 
   get headers() {
     const headers: RequestHeader = {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
     };
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
+    if (import.meta.env.VITE_API_KEY) {
+      headers["x-api-key"] = import.meta.env.VITE_API_KEY;
+    }
     return headers;
   }
 
@@ -58,34 +61,39 @@ class ApiService {
   checkResponseForErrors(
     response: AxiosResponse
   ): Promise<AxiosResponse | ServerError> {
-    if (response.data && response.data.errors) {
-      const errorObj = response.data.errors as { errors?: ACError };
+    console.log(response.data);
+    if (
+      response.data &&
+      response.data.errors &&
+      response.data.errors.friendlyMessage
+    ) {
+      const errorObj = response.data.errors as ACError;
 
-      if (errorObj.errors) {
-        if (errorObj.errors.systemErrorMessage) {
-          return Promise.reject({
-            message: errorObj.errors.systemErrorMessage,
-          });
-        }
-
+      if (errorObj.friendlyMessage) {
         return Promise.reject({
-          message: "Something went wrong.",
+          message: errorObj.friendlyMessage,
         });
       }
+
+      return Promise.reject({
+        message: "Something went wrong.",
+      });
     }
 
     return Promise.resolve(response.data);
   }
 
-  async post(url: string, body: unknown) {
+  async post(url: string, body: { [key: string]: unknown }) {
     try {
-      const response: AxiosResponse = await axios({
-        url: `${this._endpoint}${url}`,
-        method: "post",
-        data: JSON.stringify(body),
-        headers: this.headers,
-        responseType: "json",
-      });
+      const response: AxiosResponse = await axios.post(
+        `${this._endpoint}${url}`,
+        body,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       return this.checkResponseForErrors(response);
     } catch (err) {
@@ -125,7 +133,5 @@ class ApiService {
   }
 }
 
-const apiService = new ApiService(
-  "https://akamai-gw-crt.dbaas.aircanada.com/fs"
-);
+const apiService = new ApiService("http://localhost:5000");
 export default apiService;

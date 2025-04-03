@@ -1,6 +1,7 @@
-export const isPastDepartureTime = flight => {
-  if (flight.status === 'departed') return false;
+import { FlightSegment } from "../types/shared";
+
+export const isPastDepartureTime = (flight: FlightSegment) => {
   const now = new Date();
-  const scheduledDeparture = new Date(flight.scheduledDeparture);
+  const scheduledDeparture = new Date(flight.origin.localScheduledTime);
   return now > scheduledDeparture;
 };
