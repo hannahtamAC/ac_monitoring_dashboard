@@ -1,7 +1,6 @@
 export type RequestHeader = {
-  "Content-Type": string;
+  Content-Type: string;
   Authorization?: string;
-  "x-api-key"?: string;
 };
 
 export type ACError = {
@@ -21,9 +20,10 @@ export type ServerError = {
 export type ApiMethods = "PUT" | "POST" | "GET";
 
 export type Airlines = "Air Canada" | "Air Canada Rouge" | "Air Canada Jazz";
-export type AirlineCode = "AC" | "ACR" | "JAZZ";
+export type AirlineCode = "AC" | "ACR" | "QK";
 export type Operators = "mainline" | "rouge" | "jazz";
 export type FlightStatuses = "EARLY" | "ONTIME" | "DELAYED" | "CANCELLED";
+export type InferredStatuses = "ARRIVING" | "BOARDING" | "DEPARTED" | "CANCELLED";
 export type FlightTypes = "domestic" | "international" | "transborder";
 
 export type FlightStatusByInboundResponse = {
@@ -83,3 +83,27 @@ export type Bound = {
 export type FlightStatusByRouteResponse = {
   bounds: Bound[];
 };
+
+export type DelayReason = {
+  code: string,
+  message: string
+}
+
+export type FlightStatus = {
+  id: string,
+  carrierCode: AirlineCode,
+  carrierName: Airlines,
+  flightNumber: string,
+  scheduledBoardingStart: string,
+  scheduledBoardingEnd: string,
+  delayReason?: DelayReason[],
+  estimatedBoardingEnd: string,
+  estimatedBoardingStart: string,
+  aircraftCode: string,
+  fin: string,
+  statusCode: FlightStatuses,
+  gate: string,
+  destinationAirportCode: string,
+  originAirportCode: string,
+  checkInOpen: boolean
+}

@@ -15,29 +15,30 @@ import {
   GlobeIcon,
 } from "lucide-react";
 import { useAnimations } from "../contexts/AnimationContext";
-import {
-  AirlineCode,
-  FlightSegment,
-  FlightStatusByRouteResponse,
-} from "../types/shared";
+import { AirlineCode, FlightStatus } from "../types/shared";
 import { StationSelector } from "./StationSelector";
 import { useQuery } from "../hooks/useQuery";
 
 export const FlightTracker = () => {
   const {
-    response: flightsStatusByInbound,
-    makeRequest,
+    response: flightStatuses,
+    makeRequest: getFlightStatuses,
     error,
-  } = useQuery<unknown, FlightStatusByRouteResponse>(
-    "/flightstatusbyroute",
-    "POST"
-  );
+  } = useQuery<unknown, FlightStatus[]>(`/flightstatus`, "GET");
+  const { response: originAirportCodes, makeRequest: getOriginAirportCodes } =
+    useQuery<unknown, string[]>("/airportcodes", "GET");
+  const {
+    response: destinationAirportCodes,
+    makeRequest: getDestinationAirportCodes,
+  } = useQuery<unknown, string[]>("/airportcodes?destination=1", "GET");
+  const [originIATACode, setOriginIATACode] = useState("");
+  const [destinationIATACode, setDestinationIATACode] = useState("");
 
   const { animationsEnabled, toggleAnimations } = useAnimations();
   const [activeTab, setActiveTab] = useState("active");
   const [isCompactView, setIsCompactView] = useState(false);
   const [statsFilters, setStatsFilters] = useState({
-    flightType: "all",
+    flightType: "",
     operators: [],
   });
   const [filters, setFilters] = useState<{
@@ -45,22 +46,10 @@ export const FlightTracker = () => {
     flightType: string;
     airlineCodes: AirlineCode[];
   }>({
-    status: "all",
-    flightType: "all",
+    status: "",
+    flightType: "",
     airlineCodes: [],
   });
-  const [originIATACode, setOriginIATACode] = useState("");
-  const [destinationIATACode, setDestinationIATACode] = useState("");
-
-  useEffect(() => {
-    if (originIATACode && destinationIATACode && filters.airlineCodes.length) {
-      makeRequest({
-        origin: originIATACode,
-        destination: destinationIATACode,
-        airlineCode: filters.airlineCodes[0],
-      });
-    }
-  }, [originIATACode, destinationIATACode, filters, makeRequest]);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [selectedStation, setSelectedStation] = useState("all");
@@ -73,38 +62,18 @@ export const FlightTracker = () => {
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
-  const filteredBounds = (
-    (flightsStatusByInbound && flightsStatusByInbound.bounds) ||
-    []
-  )
-    .map((bounds) => {
-      // const isActive =
-      //   flight.status !== "departed" ||
-      //   (flight.actualDeparture &&
-      //     new Date().getTime() - flight.actualDeparture.getTime() <
-      //       5 * 60 * 1000);
-      // if (activeTab === "active" && !isActive) return false;
-      // if (activeTab === "departed" && isActive) return false;
-      if (filters.flightType === "all" || bounds.type === filters.flightType) {
-        return [];
-      }
+  useEffect(() => {
+    getOriginAirportCodes();
+    getDestinationAirportCodes();
+  }, [getDestinationAirportCodes, getOriginAirportCodes]);
 
-      const filteredSegments = bounds.segments.filter((segment) => {
-        const matchesStatus =
-          filters.status === "all" ||
-          segment.origin.statusCode === filters.status;
-        // const matchesType =
-        //   filters.flightType === "all" || segment.origin.flightType === filters.flightType;
-        const matchesOperator =
-          filters.airlineCodes.length === 0 ||
-          filters.airlineCodes.includes(segment.markingFlightInfo.carrierCode);
-
-        return matchesStatus && matchesOperator;
-      });
-
-      return filteredSegments;
-    })
-    .flat();
+  useEffect(() => {
+    getFlightStatuses({
+      origin: originIATACode,
+      destination: destinationIATACode,
+      airlineCodes: filters.airlineCodes,
+    });
+  }, [destinationIATACode, getFlightStatuses, originIATACode, filters]);
 
   return (
     <div className="container mx-auto px-4 py-8 dark:bg-gray-900">
@@ -136,21 +105,23 @@ export const FlightTracker = () => {
           </div>
           <div className="flex items-center gap-4">
             <StationSelector
+              stations={originAirportCodes || []}
               value={originIATACode}
               onChange={(val: string) => setOriginIATACode(val)}
               placeholder="Origin"
             />
             <StationSelector
+              stations={destinationAirportCodes || []}
               placeholder="Destination"
               value={destinationIATACode}
               onChange={(val: string) => setDestinationIATACode(val)}
             />
-            <ExportButton flights={filteredBounds} station={selectedStation} />
+            <ExportButton flights={flightStatuses} station={selectedStation} />
           </div>
         </div>
       </div>
       <StatsPanel
-        flights={flightsStatusByInbound || []}
+        flights={flightStatuses || []}
         filters={statsFilters}
         onFilterChange={setStatsFilters}
       />
@@ -201,15 +172,15 @@ export const FlightTracker = () => {
                     },
                     {
                       value: "jazz",
-                      label: "Jazz",
-                      code: "JAZZ",
+                      label: "Air Canada Express - Jazz",
+                      code: "QK",
                     },
                   ]}
                   selected={filters.airlineCodes}
-                  onChange={(values: AirlineCode[]) =>
+                  onChange={(value) =>
                     setFilters({
                       ...filters,
-                      airlineCodes: values,
+                      airlineCodes: value,
                     })
                   }
                 />
@@ -238,7 +209,7 @@ export const FlightTracker = () => {
             </div>
           </div>
           <button
-            onClick={makeRequest}
+            onClick={getFlightStatuses}
             className="flex items-center bg-[#C60C30] hover:bg-[#a30926] text-white px-3 py-2 rounded-md transition-colors ml-auto"
           >
             <RefreshCwIcon className="h-4 w-4 mr-1" />
@@ -266,17 +237,15 @@ export const FlightTracker = () => {
         <div
           className={`space-y-2 ${isCompactView ? "space-y-2" : "space-y-4"}`}
         >
-          {filteredBounds.map((segment: FlightSegment) =>
+          {flightStatuses?.map((flight) =>
             isCompactView ? (
-              <CompactFlightCard
-                key={`${segment.destination}=${segment.origin.gate}=${segment.destination.localScheduledTime}`}
-                flight={segment}
-              />
+              <CompactFlightCard key={`${flight.id}`} flight={flight} />
             ) : (
-              <FlightCard
-                key={`${segment.destination}=${segment.origin.gate}=${segment.destination.localScheduledTime}`}
-                flight={segment}
-              />
+              // <FlightCard
+              //   key={`${flight.operatingFlightInfo.flightNumber}`}
+              //   flight={flight}
+              // />
+              <CompactFlightCard key={`${flight.id}`} flight={flight} />
             )
           )}
           {error && (
@@ -284,7 +253,7 @@ export const FlightTracker = () => {
               {error.message}
             </div>
           )}
-          {!error && filteredBounds.length === 0 && (
+          {!error && flightStatuses?.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               No flights match the current filters
             </div>

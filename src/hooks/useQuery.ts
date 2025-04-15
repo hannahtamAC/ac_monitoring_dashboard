@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import apiService from "../services/api-service";
 import { ApiMethods, ServerError } from "../types/shared";
+import { objectToQueryParams } from "../utils/utils";
 
 export function useQuery<FlightQueryBodyParams, TResponse>(
   url: string,
@@ -20,14 +21,16 @@ export function useQuery<FlightQueryBodyParams, TResponse>(
   }, []);
 
   const makeRequest = useCallback(
-    async (data?: FlightQueryBodyParams) => {
+    async (data?: FlightQueryBodyParams | { [key: string]: string }) => {
       let res;
       try {
         setLoading(true);
         setError({});
 
         if (method === "GET") {
-          res = await apiService.get(url);
+          const queryParams = objectToQueryParams(data || {});
+          const newURL = queryParams.length ? `${url}?${queryParams}` : url;
+          res = await apiService.get(newURL);
         }
         if (method === "POST") {
           res = await apiService.post(url, data);

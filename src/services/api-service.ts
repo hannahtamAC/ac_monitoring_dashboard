@@ -133,5 +133,5 @@ class ApiService {
   }
 }
 
-const apiService = new ApiService("http://localhost:5000");
+const apiService = new ApiService(import.meta.env.VITE_API_HOST_URL);
 export default apiService;
