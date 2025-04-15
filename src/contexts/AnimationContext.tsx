@@ -1,27 +1,31 @@
-import React, { useState, createContext, useContext } from 'react';
+import { useState, createContext, useContext } from "react";
 type AnimationContextType = {
   animationsEnabled: boolean;
   toggleAnimations: () => void;
 };
-const AnimationContext = createContext<AnimationContextType | undefined>(undefined);
-export const AnimationProvider = ({
-  children
-}) => {
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+const AnimationContext = createContext<AnimationContextType | undefined>(
+  undefined
+);
+export const AnimationProvider = ({ children }) => {
+  const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const toggleAnimations = () => {
-    setAnimationsEnabled(prev => !prev);
+    setAnimationsEnabled((prev) => !prev);
   };
-  return <AnimationContext.Provider value={{
-    animationsEnabled,
-    toggleAnimations
-  }}>
+  return (
+    <AnimationContext.Provider
+      value={{
+        animationsEnabled,
+        toggleAnimations,
+      }}
+    >
       {children}
-    </AnimationContext.Provider>;
+    </AnimationContext.Provider>
+  );
 };
 export const useAnimations = () => {
   const context = useContext(AnimationContext);
   if (context === undefined) {
-    throw new Error('useAnimations must be used within an AnimationProvider');
+    throw new Error("useAnimations must be used within an AnimationProvider");
   }
   return context;
 };

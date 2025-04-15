@@ -5,7 +5,7 @@ import { useQuery } from "./useQuery";
 export const useDataRefresh = <TRequest, TResponse>(
   url: string,
   method: ApiMethods = "GET",
-  interval = 30000,
+  interval = 600000,
   data?: unknown
 ) => {
   const { response, loading, error, makeRequest } = useQuery<
