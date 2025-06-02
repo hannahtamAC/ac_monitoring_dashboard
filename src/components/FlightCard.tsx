@@ -1,157 +1,166 @@
-import React from 'react';
-import { ProgressBar } from './ProgressBar';
-import { StatusBadge } from './StatusBadge';
-import { AlertCircleIcon, CheckCircleIcon, ClockIcon, LuggageIcon, AlertTriangleIcon, UserIcon } from 'lucide-react';
-import { CountdownTimer } from './CountdownTimer';
-import { getBoardingStartTime, isBoardingLate, formatBoardingTime } from '../utils/boardingUtils';
-import { isPastDepartureTime } from '../utils/timeUtils';
-import { useAnimations } from '../contexts/AnimationContext';
-import { TimeDisplay } from './TimeDisplay';
+import { ProgressBar } from "./ProgressBar";
+import { StatusBadge } from "./StatusBadge";
+import { UserIcon, LuggageIcon } from "lucide-react";
+import { getPercentComplete, isPastDepartureTime } from "../utils/timeUtils";
+import { CountdownTimer } from "./CountdownTimer";
+import { TimeDisplay } from "./TimeDisplay";
+import { useAnimations } from "../contexts/AnimationContext";
+import { FlightComment, FlightStatus } from "../types/shared";
+import CommentSection from "./CommentSection";
+import { useCallback, useEffect } from "react";
+import { useQuery } from "../hooks/useQuery";
+
+declare type FlightCardProps = {
+  flight: FlightStatus;
+  tab: "active" | "departed";
+  currentTime: number;
+  updateFlight: (flight: Partial<FlightStatus>) => void;
+};
+
 export const FlightCard = ({
-  flight
-}) => {
-  const {
-    animationsEnabled
-  } = useAnimations();
-  const getProgressValue = () => {
-    switch (flight.status) {
-      case 'boarding':
-        return Math.round(flight.boardedPassengers / flight.totalPassengers * 100);
-      case 'loading':
-        return flight.loadingProgress;
-      case 'departed':
-        return 100;
-      default:
-        return 0;
+  flight,
+  tab,
+  currentTime,
+  updateFlight,
+}: FlightCardProps) => {
+  const { animationsEnabled } = useAnimations();
+  const { response: addCommentResponse, makeRequest: addComment } = useQuery<
+    unknown,
+    FlightComment
+  >(`/flightstatuses/${flight.id}/comments`, "POST");
+
+  const cardClassName = () => {
+    if (flight.statusCode === "DLY") {
+      return "border-red-200 bg-red-50";
     }
-  };
-  const getTimeDisplay = () => {
-    if (flight.status === 'departed') {
-      const diff = flight.actualDeparture.getTime() - flight.scheduledDeparture.getTime();
-      const minutesDiff = Math.round(diff / 60000);
-      if (minutesDiff < 0) {
-        return <div className="flex items-center text-green-600">
-            <CheckCircleIcon className="h-4 w-4 mr-1" />
-            <span>{Math.abs(minutesDiff)} mins early</span>
-          </div>;
-      } else if (minutesDiff === 0) {
-        return <div className="flex items-center text-green-600">
-            <CheckCircleIcon className="h-4 w-4 mr-1" />
-            <span>On time</span>
-          </div>;
-      } else {
-        return <div className="flex items-center text-amber-600">
-            <ClockIcon className="h-4 w-4 mr-1" />
-            <span>{minutesDiff} mins late</span>
-          </div>;
-      }
+    if (isPastDepartureTime(flight, currentTime) && tab !== "departed") {
+      return `border-red-300 bg-red-50 shadow-[inset_0_0_0_2px_#ef4444] ${
+        animationsEnabled ? "animate-pulse" : "animate-pulse"
+      }`;
     }
-    return null;
+    return "border-gray-200 bg-green-50";
   };
-  const getBaggageProgress = () => {
-    return Math.round(flight.loadedBags / flight.totalBags * 100) || 0;
-  };
-  const renderBoardingInfo = () => {
-    const {
-      time: boardingStartTime,
-      minutes: boardingMinutes
-    } = getBoardingStartTime(flight);
-    const isLate = isBoardingLate(flight);
-    return <div>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1">
-            {flight.status === 'boarding' || flight.status === 'delayed' ? <div className="text-xs text-gray-500">
-                POS boarding:{' '}
-                {formatBoardingTime(getBoardingStartTime(flight).time)}
-              </div> : null}
-          </div>
-          <div className="flex items-center gap-1">
-            {isLate && <div className="flex items-center text-amber-600 text-xs">
-                <AlertTriangleIcon className="h-3 w-3 mr-1" />
-                Late Start
-              </div>}
-            <div className="text-xs font-medium">
-              {flight.status === 'boarding' && <span>
-                  {flight.boardedPassengers}/{flight.totalPassengers} pax
-                </span>}
+
+  const createNewComment = useCallback(
+    (content: string) => {
+      addComment({ content });
+    },
+    [addComment]
+  );
+
+  useEffect(() => {
+    if (addCommentResponse) {
+      console.log(addCommentResponse);
+      updateFlight({ comments: [...flight.comments, addCommentResponse] });
+    }
+  }, [addCommentResponse]);
+
+  return (
+    <div className={`bg-white border rounded-lg p-3 ${cardClassName()}`}>
+      <div className="grid grid-cols-7 gap-2 items-center">
+        <div className="col-span-1">
+          <div className="flex items-center justify-between">
+            <div className="font-bold">
+              {flight.carrierCode} {flight.flightNumber}
             </div>
           </div>
-        </div>
-        <ProgressBar value={getProgressValue()} status={flight.status} />
-        {flight.status === 'scheduled' && <div className="text-xs text-gray-500 mt-1">
-            Boarding starts at {formatBoardingTime(boardingStartTime)}
-          </div>}
-      </div>;
-  };
-  const getCardClassName = () => {
-    if (flight.status === 'departed') {
-      return flight.actualDeparture.getTime() <= flight.scheduledDeparture.getTime() ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50';
-    }
-    if (flight.status === 'delayed') {
-      return 'border-red-200 bg-red-50';
-    }
-    if (isPastDepartureTime(flight)) {
-      return `border-red-300 bg-red-50 shadow-[inset_0_0_0_2px_#ef4444] ${animationsEnabled ? 'animate-pulse' : ''}`;
-    }
-    return 'border-gray-200 bg-green-50';
-  };
-  return <div className={`bg-white border rounded-lg p-4 ${getCardClassName()}`}>
-      <div className="grid grid-cols-12 gap-4 items-center">
-        <div className="col-span-3">
-          <div className="font-bold">{flight.flightNumber}</div>
-          <div className="text-sm text-gray-500">{flight.airline}</div>
-          <div className="text-xs text-gray-400 flex items-center gap-1">
-            <span>{flight.aircraftType}</span>
-            {flight.operator !== 'mainline' && <span>• {flight.operator === 'rouge' ? 'Rouge' : 'Jazz'}</span>}
-            <span>• {flight.destinationCode}</span>
-          </div>
-        </div>
-        <div className="col-span-2">
-          <TimeDisplay scheduledTime={flight.scheduledDeparture} estimatedTime={flight.status === 'delayed' ? flight.estimatedDeparture : null} />
           <div className="text-xs text-gray-500">Gate {flight.gate}</div>
-          {(flight.status === 'boarding' || flight.status === 'delayed') && <div className="text-xs text-gray-500">
-              POS: {formatBoardingTime(getBoardingStartTime(flight).time)}
-            </div>}
+          {/* <StatusBadge status={flight.statusCode} /> */}
+          <div className="text-sm text-gray-500">Fin {flight.fin}</div>
         </div>
-        <div className="col-span-2">
-          <CountdownTimer scheduledTime={flight.scheduledDeparture} status={flight.status} actualDeparture={flight.actualDeparture} />
-        </div>
-        <div className="col-span-2">
-          <div className="flex items-center">
-            <StatusBadge status={flight.status} isBoarding={flight.boardedPassengers > 0 && flight.boardedPassengers < flight.totalPassengers} isLoading={flight.loadedBags > 0 && flight.loadedBags < flight.totalBags} scheduledDeparture={flight.scheduledDeparture} boardingComplete={flight.boardedPassengers === flight.totalPassengers} loadingComplete={flight.loadedBags === flight.totalBags} />
-            {getTimeDisplay()}
+        <div className="col-span-1">
+          <div className="text-sm text-gray-500">
+            {flight.originAirportCode} - {flight.destinationAirportCode}
           </div>
-          {flight.status === 'delayed' && <div className="mt-1 flex items-start text-sm text-red-600">
-              <AlertCircleIcon className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
-              <span>{flight.delayReason}</span>
-            </div>}
+          <TimeDisplay
+            scheduledTime={flight.scheduledBoardingEnd}
+            estimatedTime={flight.estimatedBoardingEnd}
+          />
         </div>
-        <div className="col-span-3 space-y-2">
+        <div className="col-span-1">
+          <CountdownTimer
+            scheduledTime={flight.scheduledBoardingEnd}
+            estimatedTime={flight.estimatedBoardingEnd}
+            status={flight.statusCode}
+            currentTime={currentTime}
+            tab={tab}
+          />
+        </div>
+        <div className="col-span-1">
+          <StatusBadge status={flight.statusCode} inferred />
+        </div>
+        <div className="col-span-1 space-y-2">
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center text-xs text-gray-500">
                 <UserIcon className="h-3 w-3 mr-1" />
-                <span>Boarding</span>
-              </div>
-              <div className="text-xs font-medium">
-                {flight.boardedPassengers}/{flight.totalPassengers}
+                <span>
+                  {flight.statusCode !== "CNL"
+                    ? getPercentComplete(
+                        flight.estimatedBoardingStart,
+                        flight.estimatedBoardingEnd
+                      )
+                    : 0}
+                  /100
+                </span>
               </div>
             </div>
-            <ProgressBar value={getProgressValue()} status={flight.status} startTime={flight.boardingStartTime} completeTime={flight.boardingCompleteTime} type="boarding" />
+            <ProgressBar
+              value={
+                flight.statusCode !== "CNL"
+                  ? getPercentComplete(
+                      flight.estimatedBoardingStart,
+                      flight.estimatedBoardingEnd
+                    )
+                  : 0
+              }
+              status={flight}
+              startTime={new Date(flight.estimatedBoardingStart)}
+              completeTime={new Date(flight.estimatedBoardingEnd)}
+              type="boarding"
+            />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center text-xs text-gray-500">
                 <LuggageIcon className="h-3 w-3 mr-1" />
-                <span>Baggage</span>
-              </div>
-              <div className="text-xs font-medium">
-                {flight.loadedBags}/{flight.totalBags}
+                <span>
+                  {" "}
+                  {flight.statusCode !== "CNL"
+                    ? getPercentComplete(
+                        flight.estimatedBoardingStart,
+                        flight.estimatedBoardingEnd
+                      )
+                    : 0}
+                  /100
+                </span>
               </div>
             </div>
-            <ProgressBar value={getBaggageProgress()} status={flight.status === 'delayed' ? 'delayed' : 'loading'} startTime={flight.loadingStartTime} completeTime={flight.loadingCompleteTime} type="baggage" />
+            <ProgressBar
+              value={
+                flight.statusCode !== "CNL"
+                  ? getPercentComplete(
+                      flight.estimatedBoardingStart,
+                      flight.estimatedBoardingEnd
+                    )
+                  : 0
+              }
+              status={flight}
+              startTime={new Date(flight.scheduledBoardingStart)}
+              completeTime={new Date(flight.scheduledBoardingEnd)}
+              type="baggage"
+            />
+          </div>
+        </div>
+        <div className="col-span-2 space-y-2">
+          <div className="m-2">
+            <CommentSection
+              comments={flight.comments}
+              onSubmit={createNewComment}
+            />
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };

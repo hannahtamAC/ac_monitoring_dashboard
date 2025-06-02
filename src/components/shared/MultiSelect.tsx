@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
-import { AirlineCode, Operators } from "../types/shared";
+import { AirlineCode, Operators } from "../../types/shared";
 
 type MultiSelectProps = {
   options: { value: Operators; label: string; code: AirlineCode }[];
@@ -40,7 +40,7 @@ export const MultiSelect = ({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="flex items-center justify-between w-32 text-sm text-gray-700 dark:text-gray-200 bg-transparent focus:outline-none"
+        className="flex items-center justify-between w-32 text-sm dark:text-white bg-transparent focus:outline-none"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="truncate">{displayValue}</span>
@@ -68,7 +68,7 @@ export const MultiSelect = ({
                   <CheckIcon className="h-3 w-3 text-white" />
                 )}
               </div>
-              <span className="text-sm">{option.label}</span>
+              <span className="text-sm dark:text-white">{option.label}</span>
             </div>
           ))}
         </div>

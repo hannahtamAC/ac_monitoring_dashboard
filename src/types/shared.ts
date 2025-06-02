@@ -1,5 +1,5 @@
 export type RequestHeader = {
-  Content-Type: string;
+  "Content-Type": string;
   Authorization?: string;
 };
 
@@ -20,10 +20,14 @@ export type ServerError = {
 export type ApiMethods = "PUT" | "POST" | "GET";
 
 export type Airlines = "Air Canada" | "Air Canada Rouge" | "Air Canada Jazz";
-export type AirlineCode = "AC" | "ACR" | "QK";
+export type AirlineCode = "AC" | "QK" | "RV";
 export type Operators = "mainline" | "rouge" | "jazz";
-export type FlightStatuses = "EARLY" | "ONTIME" | "DELAYED" | "CANCELLED";
-export type InferredStatuses = "ARRIVING" | "BOARDING" | "DEPARTED" | "CANCELLED";
+export type FlightStatuses = "EAR" | "ONT" | "DLY" | "CNL";
+export type InferredStatuses =
+  | "ARRIVING"
+  | "BOARDING"
+  | "DEPARTED"
+  | "CANCELLED";
 export type FlightTypes = "domestic" | "international" | "transborder";
 
 export type FlightStatusByInboundResponse = {
@@ -85,25 +89,33 @@ export type FlightStatusByRouteResponse = {
 };
 
 export type DelayReason = {
-  code: string,
-  message: string
-}
+  code: string;
+  message: string;
+};
 
 export type FlightStatus = {
-  id: string,
-  carrierCode: AirlineCode,
-  carrierName: Airlines,
-  flightNumber: string,
-  scheduledBoardingStart: string,
-  scheduledBoardingEnd: string,
-  delayReason?: DelayReason[],
-  estimatedBoardingEnd: string,
-  estimatedBoardingStart: string,
-  aircraftCode: string,
-  fin: string,
-  statusCode: FlightStatuses,
-  gate: string,
-  destinationAirportCode: string,
-  originAirportCode: string,
-  checkInOpen: boolean
-}
+  id: string;
+  carrierCode: AirlineCode;
+  carrierName: Airlines;
+  flightNumber: string;
+  scheduledBoardingStart: string;
+  scheduledBoardingEnd: string;
+  delayReason?: DelayReason[];
+  estimatedBoardingEnd: string;
+  estimatedBoardingStart: string;
+  aircraftCode: string;
+  fin: string;
+  statusCode: FlightStatuses;
+  gate: string;
+  destinationAirportCode: string;
+  originAirportCode: string;
+  checkInOpen: boolean;
+  comments: FlightComment[];
+};
+
+export type FlightComment = {
+  id: string;
+  user: string;
+  text: string;
+  timestamp: string;
+};
