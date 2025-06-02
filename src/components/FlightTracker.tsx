@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlightCard } from "./FlightCard";
 import { CompactFlightCard } from "./CompactFlightCard";
 import { TabSelector } from "./TabSelector";
@@ -6,7 +6,7 @@ import { ViewModeToggle } from "./ViewModeToggle";
 import { DarkModeToggle } from "./DarkModeToggle";
 import { ExportButton } from "./ExportButton";
 import { StatsPanel } from "./StatsPanel";
-import { MultiSelect } from "./MultiSelect";
+import { MultiSelect } from "./shared/MultiSelect";
 import SearchInput from "./SearchInput";
 import {
   PlaneTakeoffIcon,
@@ -21,34 +21,36 @@ import { useQuery } from "../hooks/useQuery";
 
 export const FlightTracker = () => {
   const {
-    response: flightStatuses,
+    response: getFlightStatusesResponse,
     makeRequest: getFlightStatuses,
     error,
-  } = useQuery<unknown, FlightStatus[]>(`/flightstatus`, "GET");
+  } = useQuery<unknown, FlightStatus[]>(`/flightstatuses`, "GET");
+
   const { response: originAirportCodes, makeRequest: getOriginAirportCodes } =
     useQuery<unknown, string[]>("/airportcodes", "GET");
   const {
     response: destinationAirportCodes,
     makeRequest: getDestinationAirportCodes,
   } = useQuery<unknown, string[]>("/airportcodes?destination=1", "GET");
+  const [refresh, setRefresh] = useState(false);
+
   const [originIATACode, setOriginIATACode] = useState("");
   const [destinationIATACode, setDestinationIATACode] = useState("");
 
   const { animationsEnabled, toggleAnimations } = useAnimations();
-  const [activeTab, setActiveTab] = useState("active");
+  const [activeTab, setActiveTab] = useState<"active" | "departed">("active");
   const [isCompactView, setIsCompactView] = useState(false);
-  const [statsFilters, setStatsFilters] = useState({
-    flightType: "",
-    operators: [],
-  });
+
   const [filters, setFilters] = useState<{
     status: string;
     flightType: string;
     airlineCodes: AirlineCode[];
+    flightNumber: string;
   }>({
     status: "",
     flightType: "",
     airlineCodes: [],
+    flightNumber: "",
   });
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -72,8 +74,53 @@ export const FlightTracker = () => {
       origin: originIATACode,
       destination: destinationIATACode,
       airlineCodes: filters.airlineCodes,
+      status: filters.status,
+      flightNumber: filters.flightNumber,
     });
-  }, [destinationIATACode, getFlightStatuses, originIATACode, filters]);
+  }, [
+    destinationIATACode,
+    getFlightStatuses,
+    originIATACode,
+    filters,
+    refresh,
+  ]);
+
+  const [currentTime, setCurrentTime] = useState(new Date().getTime());
+  useEffect(() => {
+    const updateTimer = () => {
+      setCurrentTime(new Date().getTime());
+    };
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [flightStatuses, setFlightStatuses] = useState<{
+    active: FlightStatus[];
+    departed: FlightStatus[];
+  }>({ active: [], departed: [] });
+
+  useEffect(() => {
+    setFlightStatuses(() => {
+      const newFlightStatuses: {
+        active: FlightStatus[];
+        departed: FlightStatus[];
+      } = { active: [], departed: [] };
+
+      (getFlightStatusesResponse || []).map((curr) => {
+        const now = new Date();
+        const estimatedBoardingEnd = new Date(curr.estimatedBoardingEnd);
+
+        if (estimatedBoardingEnd < now) {
+          newFlightStatuses.departed.push(curr);
+        } else {
+          newFlightStatuses.active.push(curr);
+        }
+      });
+
+      return newFlightStatuses;
+    });
+  }, [getFlightStatusesResponse]);
 
   return (
     <div className="container mx-auto px-4 py-8 dark:bg-gray-900">
@@ -116,15 +163,14 @@ export const FlightTracker = () => {
               value={destinationIATACode}
               onChange={(val: string) => setDestinationIATACode(val)}
             />
-            <ExportButton flights={flightStatuses} station={selectedStation} />
+            <ExportButton
+              flights={flightStatuses[activeTab]}
+              station={selectedStation}
+            />
           </div>
         </div>
       </div>
-      <StatsPanel
-        flights={flightStatuses || []}
-        filters={statsFilters}
-        onFilterChange={setStatsFilters}
-      />
+      <StatsPanel currentTime={currentTime} />
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
         <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -136,7 +182,16 @@ export const FlightTracker = () => {
             />
           </div>
           <div className="flex-1 flex items-center gap-3 max-w-4xl">
-            <SearchInput placeholder="Search flight" />
+            <SearchInput
+              value={filters.flightNumber}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  flightNumber: e,
+                })
+              }
+              placeholder="Search flight number"
+            />
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md">
                 <GlobeIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -168,7 +223,7 @@ export const FlightTracker = () => {
                     {
                       value: "rouge",
                       label: "Rouge",
-                      code: "ACR",
+                      code: "RV",
                     },
                     {
                       value: "jazz",
@@ -198,54 +253,72 @@ export const FlightTracker = () => {
                       })
                     }
                   >
-                    <option value="all">All Status</option>
-                    <option value="EARLY">EARLY</option>
-                    <option value="ONTIME">ONTIME</option>
-                    <option value="DELAYED">DELAYED</option>
-                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="">All Status</option>
+                    <option value="EAR">Early</option>
+                    <option value="ONT">On time</option>
+                    <option value="DLY">Delayed</option>
+                    <option value="CNL">Cancelled</option>
                   </select>
                 </div>
               )}
             </div>
           </div>
           <button
-            onClick={getFlightStatuses}
+            onClick={() => setRefresh((prev) => !prev)}
             className="flex items-center bg-[#C60C30] hover:bg-[#a30926] text-white px-3 py-2 rounded-md transition-colors ml-auto"
           >
             <RefreshCwIcon className="h-4 w-4 mr-1" />
             Refresh
           </button>
         </div>
-        <div className="bg-gray-50 rounded-md p-3 mb-6 grid grid-cols-12 text-sm font-medium text-gray-500">
+        <div className="bg-gray-50 rounded-md p-3 mb-6 grid grid-cols-7 text-sm font-medium text-gray-500">
           {isCompactView ? (
             <>
-              <div className="col-span-3">Flight</div>
-              <div className="col-span-3">Time</div>
-              <div className="col-span-3">Countdown</div>
+              <div className="col-span-1">Flight</div>
+              <div className="col-span-1">Time</div>
+              <div className="col-span-1">Countdown</div>
               <div className="col-span-3">Progress</div>
             </>
           ) : (
             <>
-              <div className="col-span-3">Flight</div>
-              <div className="col-span-2">Time</div>
-              <div className="col-span-2">Countdown</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-3">Boarding/Loading</div>
+              <div className="col-span-1">Flight</div>
+              <div className="col-span-1">Time</div>
+              <div className="col-span-1">Countdown</div>
+              <div className="col-span-1">Status</div>
+              <div className="col-span-1">Boarding/Loading</div>
+              <div className="col-span-2">Comments</div>
             </>
           )}
         </div>
         <div
           className={`space-y-2 ${isCompactView ? "space-y-2" : "space-y-4"}`}
         >
-          {flightStatuses?.map((flight) =>
+          {flightStatuses[activeTab].map((flight, i) =>
             isCompactView ? (
-              <CompactFlightCard key={`${flight.id}`} flight={flight} />
+              <CompactFlightCard
+                key={`${flight.id}`}
+                flight={flight}
+                tab={activeTab}
+                currentTime={currentTime}
+              />
             ) : (
-              // <FlightCard
-              //   key={`${flight.operatingFlightInfo.flightNumber}`}
-              //   flight={flight}
-              // />
-              <CompactFlightCard key={`${flight.id}`} flight={flight} />
+              <FlightCard
+                key={`${flight.id}`}
+                flight={flight}
+                tab={activeTab}
+                currentTime={currentTime}
+                updateFlight={(newFlight: Partial<FlightStatus>) => {
+                  flightStatuses[activeTab];
+                  setFlightStatuses((prev) => {
+                    const copy = { ...prev };
+                    copy[activeTab][i] = {
+                      ...copy[activeTab][i],
+                      ...newFlight,
+                    };
+                    return copy;
+                  });
+                }}
+              />
             )
           )}
           {error && (
@@ -253,7 +326,7 @@ export const FlightTracker = () => {
               {error.message}
             </div>
           )}
-          {!error && flightStatuses?.length === 0 && (
+          {!error && flightStatuses[activeTab]?.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               No flights match the current filters
             </div>

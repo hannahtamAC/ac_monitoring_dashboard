@@ -2,19 +2,22 @@ import { useEffect, useState } from "react";
 import { ClockIcon } from "lucide-react";
 import { useAnimations } from "../contexts/AnimationContext";
 import { FlightStatuses } from "../types/shared";
-import { UTCToLocalTime } from "../utils/timeUtils";
 
 type CoundDownTimerProps = {
   scheduledTime: string;
   estimatedTime: string;
   status: FlightStatuses;
   actualDeparture?: string;
+  currentTime: number;
+  tab: "active" | "departed";
 };
 export const CountdownTimer = ({
   scheduledTime,
   estimatedTime,
   status,
   actualDeparture,
+  currentTime,
+  tab,
 }: CoundDownTimerProps) => {
   const [timeLeft, setTimeLeft] = useState("");
   const [timerState, setTimerState] = useState("normal");
@@ -23,41 +26,11 @@ export const CountdownTimer = ({
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const now = new Date();
-      const departure = new Date(scheduledTime);
-      const diff = departure.getTime() - now.getTime();
+      const departure = new Date(estimatedTime);
+      const diff = departure.getTime() - currentTime;
       const totalSeconds = Math.floor(diff / 1000);
       const minutesLeft = Math.floor(totalSeconds / 60);
-      if (status === "ONTIME" && actualDeparture) {
-        const departureDelay =
-          new Date(actualDeparture).getTime() -
-          new Date(scheduledTime).getTime();
-        const delayMinutes = Math.round(departureDelay / 60000);
-        return {
-          display:
-            delayMinutes < 0
-              ? `${Math.abs(delayMinutes)}m early`
-              : delayMinutes === 0
-              ? "On time"
-              : `${delayMinutes}m late`,
-          state: delayMinutes <= 0 ? "departed-ontime" : "departed-late",
-        };
-      }
-      if (minutesLeft <= -60) {
-        const delaySeconds = Math.abs(totalSeconds);
-        const hours = Math.floor(delaySeconds / 3600);
-        const minutes = Math.floor((delaySeconds % 3600) / 60);
-        const seconds = delaySeconds % 60;
 
-        setDelayDuration(`Delayed ${hours ? `${hours}h ` : ""}${minutes}m`);
-        setTimerState("normal");
-        return {
-          display: `-${hours.toString().padStart(2, "0")}:${minutes
-            .toString()
-            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`,
-          state: "normal",
-        };
-      }
       if (minutesLeft <= 60) {
         if (minutesLeft <= 5) {
           setTimerState("urgent");
@@ -76,30 +49,35 @@ export const CountdownTimer = ({
             }${minutes.toString().padStart(2, "0")}:${seconds
               .toString()
               .padStart(2, "0")}`,
-            state: timerState,
           };
         }
+      }
+      if (minutesLeft <= -75) {
+        const delaySeconds = Math.abs(totalSeconds);
+        const hours = Math.floor(delaySeconds / 3600);
+        const minutes = Math.floor((delaySeconds % 3600) / 60);
+        const seconds = delaySeconds % 60;
+
+        setDelayDuration(`Delayed ${hours ? `${hours}h ` : ""}${minutes}m`);
+        setTimerState("normal");
+        return {
+          display: `-${hours.toString().padStart(2, "0")}:${minutes
+            .toString()
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`,
+          state: "normal",
+        };
       }
       return {
         display: "",
         state: "normal",
       };
     };
-    const updateTimer = () => {
-      const result = calculateTimeLeft();
-      if (result.display) {
-        setTimeLeft(result.display);
-        setTimerState(result.state);
-      } else {
-        setTimeLeft("");
-      }
-    };
-    updateTimer();
-    const timer = setInterval(updateTimer, 1000);
-    return () => clearInterval(timer);
-  }, [scheduledTime, status, actualDeparture, timerState]);
+    const result = calculateTimeLeft();
+    setTimeLeft(result.display);
+    setTimerState((prev) => result.state || prev);
+  }, [scheduledTime, status, actualDeparture, estimatedTime, currentTime]);
 
-  if (!timeLeft) return null;
+  if (!timeLeft || tab == "departed") return null;
   const getTimerStyles = () => {
     const baseStyles = "flex items-center gap-1";
     switch (timerState) {

@@ -44,17 +44,23 @@ export const getInferredStatus = (flight: FlightStatus) => {
   const estimatedBoardingStart = new Date(flight.estimatedBoardingStart);
   const estimatedBoardingEnd = new Date(flight.estimatedBoardingEnd);
 
-  if (flight.statusCode == "CANCELLED") {
+  if (flight.statusCode == "CNL") {
     return "CANCELLED";
   }
-  if (now < estimatedBoardingStart && !flight.checkInOpen) {
-    return "ARRIVING";
+  if (flight.statusCode == "DLY") {
+    return "DELAYED";
   }
-  if (now > estimatedBoardingStart && flight.checkInOpen) {
+  if (flight.statusCode == "EAR") {
+    return "EARLY";
+  }
+  if (now > estimatedBoardingStart && now < estimatedBoardingEnd) {
     return "BOARDING";
   }
-  if (now > estimatedBoardingEnd && !flight.checkInOpen) {
+  if (now > estimatedBoardingEnd) {
     return "DEPARTED";
+  }
+  if (flight.statusCode == "ONT") {
+    return "ONTIME";
   }
 
   return "";

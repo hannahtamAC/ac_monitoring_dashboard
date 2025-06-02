@@ -1,48 +1,49 @@
 import { ProgressBar } from "./ProgressBar";
-import { StatusBadge } from "./StatusBadge";
-import { ClockIcon, UserIcon, LuggageIcon } from "lucide-react";
-import { isPastDepartureTime, UTCToLocalTime } from "../utils/timeUtils";
+import { UserIcon, LuggageIcon } from "lucide-react";
+import { getPercentComplete, isPastDepartureTime } from "../utils/timeUtils";
 import { CountdownTimer } from "./CountdownTimer";
 import { TimeDisplay } from "./TimeDisplay";
 import { useAnimations } from "../contexts/AnimationContext";
 import { FlightStatus } from "../types/shared";
-import { getInferredStatus } from "../utils/boardingUtils";
 
 declare type CompactFlightCardProps = {
   flight: FlightStatus;
+  tab: "active" | "departed";
+  currentTime: number;
 };
-export const CompactFlightCard = ({ flight }: CompactFlightCardProps) => {
+export const CompactFlightCard = ({
+  flight,
+  tab,
+  currentTime,
+}: CompactFlightCardProps) => {
   const { animationsEnabled } = useAnimations();
-  const getCardClassName = () => {
-    if (flight.statusCode === "DELAYED") {
+
+  const cardClassName = () => {
+    if (flight.statusCode === "DLY") {
       return "border-red-200 bg-red-50";
     }
-    if (isPastDepartureTime(flight)) {
+    if (isPastDepartureTime(flight, currentTime) && tab !== "departed") {
       return `border-red-300 bg-red-50 shadow-[inset_0_0_0_2px_#ef4444] ${
-        animationsEnabled ? "animate-pulse" : ""
+        animationsEnabled ? "animate-pulse" : "animate-pulse"
       }`;
     }
     return "border-gray-200 bg-green-50";
   };
-  const getBoardingProgress = () => {
-    return Math.round(0 * 100) || 0;
-  };
-  const getBaggageProgress = () => {
-    return Math.round(0 * 100) || 0;
-  };
+
   return (
-    <div className={`bg-white border rounded-lg p-3 ${getCardClassName()}`}>
-      <div className="grid grid-cols-12 gap-2 items-center">
-        <div className="col-span-3">
+    <div className={`bg-white border rounded-lg p-3 ${cardClassName()}`}>
+      <div className="grid grid-cols-7 gap-2 items-center">
+        <div className="col-span-1">
           <div className="flex items-center justify-between">
             <div className="font-bold">
               {flight.carrierCode} {flight.flightNumber}
             </div>
           </div>
           <div className="text-xs text-gray-500">Gate {flight.gate}</div>
-          <StatusBadge status={flight.statusCode} />
+          {/* <StatusBadge status={flight.statusCode} /> */}
+          <div className="text-sm text-gray-500">Fin {flight.fin}</div>
         </div>
-        <div className="col-span-2">
+        <div className="col-span-1">
           <div className="text-sm text-gray-500">
             {flight.originAirportCode} - {flight.destinationAirportCode}
           </div>
@@ -51,27 +52,41 @@ export const CompactFlightCard = ({ flight }: CompactFlightCardProps) => {
             estimatedTime={flight.estimatedBoardingEnd}
           />
         </div>
-        <div className="col-span-2">
+        <div className="col-span-1">
           <CountdownTimer
             scheduledTime={flight.scheduledBoardingEnd}
+            estimatedTime={flight.estimatedBoardingEnd}
             status={flight.statusCode}
-            actualDeparture={flight.estimatedBoardingEnd}
+            currentTime={currentTime}
+            tab={tab}
           />
         </div>
-        <div className="col-span-2">
-          <StatusBadge status={getInferredStatus(flight)} inferred />
-        </div>
-        <div className="col-span-3 space-y-2">
+        <div className="col-span-1 space-y-2">
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center text-xs text-gray-500">
                 <UserIcon className="h-3 w-3 mr-1" />
-                <span>{0}/100</span>
+                <span>
+                  {flight.statusCode !== "CNL"
+                    ? getPercentComplete(
+                        flight.estimatedBoardingStart,
+                        flight.estimatedBoardingEnd
+                      )
+                    : 0}
+                  /100
+                </span>
               </div>
             </div>
             <ProgressBar
-              value={getBoardingProgress()}
-              status={flight.statusCode}
+              value={
+                flight.statusCode !== "CNL"
+                  ? getPercentComplete(
+                      flight.estimatedBoardingStart,
+                      flight.estimatedBoardingEnd
+                    )
+                  : 0
+              }
+              status={flight}
               startTime={new Date(flight.estimatedBoardingStart)}
               completeTime={new Date(flight.estimatedBoardingEnd)}
               type="boarding"
@@ -81,13 +96,29 @@ export const CompactFlightCard = ({ flight }: CompactFlightCardProps) => {
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center text-xs text-gray-500">
                 <LuggageIcon className="h-3 w-3 mr-1" />
-                <span>0/100</span>
+                <span>
+                  {" "}
+                  {flight.statusCode !== "CNL"
+                    ? getPercentComplete(
+                        flight.estimatedBoardingStart,
+                        flight.estimatedBoardingEnd
+                      )
+                    : 0}
+                  /100
+                </span>
               </div>
             </div>
             <ProgressBar
-              value={getBaggageProgress()}
-              status={flight.statusCode === "DELAYED" ? "delayed" : "loading"}
-              startTime={new Date(flight.scheduledBoardingStartTime)}
+              value={
+                flight.statusCode !== "CNL"
+                  ? getPercentComplete(
+                      flight.estimatedBoardingStart,
+                      flight.estimatedBoardingEnd
+                    )
+                  : 0
+              }
+              status={flight}
+              startTime={new Date(flight.scheduledBoardingStart)}
               completeTime={new Date(flight.scheduledBoardingEnd)}
               type="baggage"
             />
